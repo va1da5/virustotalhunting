@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>
+		VirusTotal YARA Notifications
+	</title>
+	<!-- Bootstrap -->
+	<link href="css/bootstrap.min.css" rel="stylesheet" />
+	<link href="css/font-awesome.min.css" rel="stylesheet" />
+	<link href="css/sweetalert.css" rel="stylesheet" />
+	<link href="css/style.css" rel="stylesheet" />
+	<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+	<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+	<!--[if lt IE 9]>
+                <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+                <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+</head>
+
+<body id="app">
+	<nav class="navbar navbar-default navbar-fixed-top">
+		<div class="container-fluid">
+			<div class="navbar-header">
+				<span class="navbar-brand">VirusTotal Huntig</span>
+			</div>
+			<!-- Collect the nav links, forms, and other content for toggling -->
+			<div class="collapse navbar-collapse">
+				<div class="navbar-form navbar-left" v-show="api.data.length">
+					<div class="form-group">
+						<input v-model="table.filter" type="text" class="form-control" placeholder="Search">
+					</div>
+				</div>
+				<div class="navbar-form navbar-left" v-show="api.data.length" style="display: none;">
+					<div class="form-group">
+						<button @click="selectDetected" v-if="AV.selectedAVs.length" class="btn btn-default" title="Select files already detected by choosen antivirus systems"><i class="fa fa-eye-slash" aria-hidden="true"></i> Select Detected</button>
+						<button @click="removeSelectedFiles" class="btn btn-default" title="Rermanently remove selected files from notification stream"><i class="fa fa-check-square-o" aria-hidden="true"></i> Remove Selected</button>
+						<button @click="getData()" class="btn btn-default" title="Refresh table"><i class="fa fa-refresh" aria-hidden="true"></i> Refresh</button>
+						<button @click="showAVsettings(true)" class="btn btn-default" title="Choose antivirus systems that you are using"><i class="fa fa-cog" aria-hidden="true"></i> Choose AVs</button>
+					</div>
+				</div>
+				<div class="navbar-form navbar-right">
+					<div class="form-group">
+						<input v-model="api.key" v-show="api.showAPIKeyInput" type="text" class="form-control" placeholder="Your API key here">
+					</div>
+					<button @click="apiKey('set')" v-show="api.showAPIKeyInput" class="btn btn-primary"><i class="fa fa-floppy-o" aria-hidden="true"></i> Save</button>
+					<button @click="apiKey('cancel')" v-show="api.showAPIKeyInput" class="btn btn-default">Cancel</button>
+					<button @click="apiKey('update')" v-if="!api.showAPIKeyInput" class="btn btn-default btn-sm"><i class="fa fa-key" aria-hidden="true"></i> Update API Key</button>
+				</div>
+			</div>
+			<!-- /.navbar-collapse -->
+		</div>
+		<!-- /.container-fluid -->
+	</nav>
+	<br>
+	<br>
+	<div class="container-fliud">
+		<div class="row">
+			<div class="col-md-1"></div>
+			<div class="col-md-10">
+				<br>
+				<table class="table table-bordered results-table" style="font-size:0.9em; display: none;" v-show="api.data.length">
+					<thead class="noselect">
+						<tr>
+							<th class="col-0"><a @click="selectFiles"><i class="fa fa-check-square-o" aria-hidden="true"></i></a></th>
+							<th class="col-1"><i class="fa fa-caret-down" aria-hidden="true"></i><a @click="sortBy('sha256')"> Files </a> <span class="badge pull-right" title="Number of file in the notification stream">{{api.data.length}}</span></th>
+							<th class="col-2"><i class="fa fa-caret-down" aria-hidden="true"></i> <a @click="sortBy('first_seen_unix')"> First Seen</a></th>
+							<th class="col-3"><i class="fa fa-caret-down" aria-hidden="true"></i> <a @click="sortBy('date_unix')"> Date</a></th>
+							<th class="col-4"><i class="fa fa-caret-down" aria-hidden="true"></i> <a @click="sortBy('positives')"> Ratio</a></th>
+							<th class="col-5"><i class="fa fa-caret-down" aria-hidden="true"></i><a @click="sortBy('ratio')"> Rule</a></th>
+							<th class="col-6">Ruleset</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="file in api.data | filterBy table.filter in 'sha1' 'sha256' 'md5' 'type' 'subject' 'ruleset_name'| orderBy table.sortKey table.sortOrders[table.sortKey]">
+							<td class="{{ file | AVDetected}} ">
+								<div class="checkbox">
+									<label>
+										<input type="checkbox" v-model="file.checked">
+									</label>
+							</td>
+							<td>
+								<a href="{{api.link.search}}{{file.sha256}}" target="_blank">{{file.sha256}}</a>
+								<br>
+								<a href="{{api.link.search}}{{file.md5}}" target="_blank">{{file.md5}}</a>
+								<br>
+								<a href="{{api.link.download}}{{file.sha256}}"><i class="fa fa-download" aria-hidden="true"></i></a>
+								<i @mouseover="showAV($event, file)" @mouseleave="showAV(false)" class="fa fa-list pointer" aria-hidden="true"></i>
+								<i @mouseover="showMatch($event, file)" @mouseleave="showMatch(false)" class="fa fa-eye pointer" aria-hidden="true"></i>
+								<span class="label label-primary">{{file.type}}</span>
+								<span class="label label-default">{{file.size_human}}</span>
+								<span v-show="file.is_new" class="label label-danger">New Sample</span>
+							</td>
+							<td>{{file.first_seen_human}}</td>
+							<td>{{file.date}}</td>
+							<td>{{file.ratio}}</td>
+							<td>{{file.subject}}</td>
+							<td>{{file.ruleset_name}}</td>
+						</tr>
+					</tbody>
+				</table>
+				<button @click="getData(true)" v-show="api.data.length" class="btn btn-default" style="display: none;">Load more..</button>
+				<br>
+				<br>
+				<!-- <pre>{{ old | json}}</pre> -->
+				<div v-if="!api.key.length && !api.data.length">
+					<div class="page-header">
+						<h1>Welcome</h1>
+					</div>
+					<h3>You are one step away from using this application. Please provide your private VirusTotal API key and save it. It will <b>only</b> be stored in your browser storage. If you have multiple keys please note that one API key works only on one browser.</h3>
+					<h3> Happy hunting!</h3>
+				</div>
+				</div>
+				<div class="col-md-1"></div>
+			</div>
+		</div>
+		<div id="match-window" class="shadow-3" style="display:none">
+			<pre>{{{table.showContent | markContent }}}</pre>
+		</div>
+		<div id="AV-window" class="shadow-3" style="display:none">
+			<ul class="list break-list-3" v-if="table.AVContent | AVtable | isDetection">
+				<li v-for="(key,value) in table.AVContent | AVtable"><span class="label {{ key | highlightAV }}">{{key}}</span> <span>{{value}}</span></li>
+			</ul>
+			<div v-if="table.AVContent | AVtable | isDetection true">
+				<p>No detection</p>
+			</div>
+		</div>
+		<div id="AV-selection-window-container" @click="showAVsettings(false)" style="display:none"></div>
+		<div id="AV-selection-window" style="display:none">
+			<div class="panel panel-primary shadow-3">
+				<div class="panel-heading">
+					<h3 class="panel-title">Please select Antivirus systems you are using</h3>
+				</div>
+				<div class="panel-body">
+					<ul class="list break-list-5">
+						<li v-for="item in AV.checklist">
+							<div class="checkbox">
+								<label>
+									<input v-model="item.checked" type="checkbox"> {{item.name}}
+								</label>
+							</div>
+						</li>
+					</ul>
+					<div class="form-group">
+						<button @click="saveAVSelection()" class="btn btn-primary pull-right">Save</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="loader" v-if="api.loading"><i class="fa fa-spinner fa-pulse fa-3x fa-fw"></i></div>
+		<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+		<script src="js/jquery.min.js"></script>
+		<!-- Include all compiled plugins (below), or include individual files as needed -->
+		<script src="js/bootstrap.min.js"></script>
+		<script src="js/sweetalert.min.js"></script>
+		<script src="js/vue.min.js"></script>
+		<script src="js/moment.min.js"></script>
+		<script src="js/app.js"></script>
+</body>
+
+</html>
