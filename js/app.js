@@ -12,6 +12,8 @@ Vue.filter('AVDetected', function(file) {
 
 	if (list.length === 0) return '';
 
+	if (count > 0 && count < list.length && count !== list.length) return 'avs-partial';
+
 	return (count === list.length) ? 'avs-safe' : 'avs-failed';
 });
 
@@ -52,7 +54,7 @@ new Vue({
 
 	data: {
 		api: {
-			url: '/api.php', // URL to PHP API file
+			url: 'api.php', // URL to PHP API file
 			delete: {
 				url: 'https://virustotal.com/intelligence/hunting/delete-notifications/?notifications={{ids}}',
 				ids: [], // stored IDs of notificatios to be removed.
@@ -66,7 +68,7 @@ new Vue({
 			next: '', // stores value for next page
 			showAPIKeyInput: false,
 			loading: false,
-			refreshInterval: 1000 * 60 * 3
+			refreshInterval: 1000 * 60 * 10
 		},
 		old: {
 			hashes: [],
@@ -147,7 +149,7 @@ new Vue({
 
 			swal({
 					title: "Are you sure?",
-					text: api.delete.ids.length + " files is going to be removed.",
+					text: api.delete.ids.length + ((api.delete.ids.length > 1) ? " files are going to be removed." : " file is going to be removed."),
 					type: "warning",
 					showCancelButton: true,
 					confirmButtonColor: "#DD6B55",
