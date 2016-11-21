@@ -98,6 +98,10 @@ a {
 	background: #5cb85c;
 }
 
+.avs-partial {
+	background: #f0ad4e;
+}
+
 .avs-failed {
 	background: #d9534f;
 }
